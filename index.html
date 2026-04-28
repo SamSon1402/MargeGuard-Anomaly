@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MargeGuard-Anomaly | ogmah Price Anomaly Detection</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --primary: #ef4444;
+  --primary-glow: rgba(239, 68, 68, 0.4);
+  --secondary: #8b5cf6;
+  --accent: #06b6d4;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --bg-dark: #050714;
+  --bg-card: #0c0f23;
+  --bg-elevated: #161a36;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --border: #2a304d;
+  --brand-gradient: linear-gradient(135deg, #ef4444 0%, #8b5cf6 50%, #06b6d4 100%);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Sora', sans-serif;
+  background: var(--bg-dark);
+  color: var(--text-primary);
+  min-height: 100vh;
+  background-image:
+    radial-gradient(ellipse at 0% 0%, rgba(239, 68, 68, 0.10) 0%, transparent 50%),
+    radial-gradient(ellipse at 100% 100%, rgba(139, 92, 246, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(6, 182, 212, 0.04) 0%, transparent 70%);
+}
+.header {
+  background: linear-gradient(180deg, rgba(239, 68, 68, 0.06) 0%, transparent 100%);
+  border-bottom: 1px solid var(--border);
+  padding: 0.75rem 2rem;
+  position: sticky; top: 0; z-index: 100;
+  backdrop-filter: blur(20px);
+}
+.header-content { max-width: 1800px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+.logo { display: flex; align-items: center; gap: 0.75rem; }
+.logo-icon {
+  width: 46px; height: 46px;
+  background: var(--brand-gradient);
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.4rem; position: relative;
+}
+.logo-icon::after {
+  content: ''; position: absolute; inset: -2px;
+  background: var(--brand-gradient); border-radius: 14px;
+  z-index: -1; opacity: 0.5; filter: blur(8px);
+}
+.logo-text {
+  font-size: 1.5rem; font-weight: 800;
+  background: var(--brand-gradient);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.logo-subtitle {
+  font-size: 0.6rem; color: var(--text-secondary);
+  text-transform: uppercase; letter-spacing: 3px; font-weight: 500;
+}
+.header-badges { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.badge {
+  background: var(--bg-card); border: 1px solid var(--border);
+  padding: 0.35rem 0.7rem; border-radius: 6px;
+  font-size: 0.65rem; color: var(--text-secondary);
+  font-family: 'Fira Code', monospace;
+}
+.badge.live { background: rgba(239, 68, 68, 0.15); border-color: var(--primary); color: var(--primary); }
+.badge.live::before {
+  content: ''; display: inline-block; width: 6px; height: 6px;
+  background: var(--primary); border-radius: 50%; margin-right: 5px;
+  animation: livePulse 1.5s ease-in-out infinite;
+}
+@keyframes livePulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 var(--primary-glow); }
+  50% { opacity: 0.6; box-shadow: 0 0 0 8px transparent; }
+}
+.main { max-width: 1800px; margin: 0 auto; padding: 1.5rem 2rem; }
+.hero { text-align: center; margin-bottom: 1.5rem; }
+.hero h1 {
+  font-size: 2.4rem; font-weight: 800; margin-bottom: 0.4rem;
+  background: var(--brand-gradient);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.hero p { color: var(--text-secondary); font-size: 1rem; }
+
+/* KPI strip */
+.kpi-strip {
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  gap: 1rem; margin-bottom: 1.25rem;
+}
+@media (max-width: 1100px) { .kpi-strip { grid-template-columns: repeat(2, 1fr); } }
+.kpi {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 12px; padding: 0.9rem 1rem;
+  display: flex; align-items: center; gap: 0.85rem;
+}
+.kpi-icon {
+  width: 40px; height: 40px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.2rem; flex-shrink: 0;
+}
+.kpi-icon.red { background: rgba(239, 68, 68, 0.15); }
+.kpi-icon.purple { background: rgba(139, 92, 246, 0.15); }
+.kpi-icon.cyan { background: rgba(6, 182, 212, 0.15); }
+.kpi-icon.green { background: rgba(16, 185, 129, 0.15); }
+.kpi-icon.amber { background: rgba(245, 158, 11, 0.15); }
+.kpi-content { flex: 1; min-width: 0; }
+.kpi-label {
+  font-size: 0.6rem; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.15rem;
+}
+.kpi-value {
+  font-size: 1.25rem; font-weight: 800;
+  font-family: 'Fira Code', monospace;
+}
+.kpi-trend {
+  font-size: 0.65rem; font-family: 'Fira Code', monospace;
+}
+.kpi-trend.up { color: var(--danger); }
+.kpi-trend.down { color: var(--success); }
+
+.workspace { display: grid; grid-template-columns: 1fr 420px; gap: 1.25rem; margin-bottom: 1.25rem; }
+@media (max-width: 1300px) { .workspace { grid-template-columns: 1fr; } }
+.card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 16px; overflow: hidden;
+}
+.card-header {
+  padding: 1rem 1.25rem; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  background: linear-gradient(180deg, rgba(22, 26, 54, 0.6) 0%, transparent 100%);
+}
+.card-title { font-size: 0.9rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem; }
+.card-body { padding: 1.25rem; }
+
+/* Product selector */
+.product-selector { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.prod-chip {
+  padding: 0.45rem 0.85rem; background: var(--bg-elevated);
+  border: 1px solid var(--border); border-radius: 20px;
+  color: var(--text-secondary); cursor: pointer; transition: all 0.2s;
+  font-family: 'Sora', sans-serif; font-size: 0.72rem; font-weight: 600;
+  display: flex; align-items: center; gap: 0.4rem;
+}
+.prod-chip:hover { border-color: var(--primary); color: var(--text-primary); }
+.prod-chip.active { background: var(--brand-gradient); border-color: transparent; color: white; }
+.prod-chip .anom-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--danger); display: inline-block;
+}
+.prod-chip.active .anom-dot { background: white; }
+.prod-chip .clean-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--success); display: inline-block;
+}
+
+/* Time series chart */
+.chart-container {
+  position: relative; background: var(--bg-elevated);
+  border-radius: 12px; padding: 1rem;
+  margin-bottom: 1rem;
+}
+.chart-svg-wrap { position: relative; width: 100%; height: 280px; }
+.chart-svg { width: 100%; height: 100%; }
+.chart-anom-tooltip {
+  position: absolute; background: var(--bg-card);
+  border: 1px solid var(--danger); border-radius: 8px;
+  padding: 0.5rem 0.75rem; pointer-events: none;
+  font-size: 0.7rem; opacity: 0; transition: opacity 0.2s;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5); z-index: 10;
+}
+.chart-anom-tooltip.show { opacity: 1; }
+
+.chart-legend {
+  display: flex; gap: 1rem; justify-content: center;
+  font-size: 0.7rem; margin-top: 0.5rem;
+  font-family: 'Fira Code', monospace;
+}
+.legend-item { display: flex; align-items: center; gap: 0.4rem; }
+.legend-swatch { width: 14px; height: 3px; border-radius: 2px; }
+
+/* STL panels */
+.stl-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem; margin-top: 0.75rem;
+}
+.stl-panel {
+  background: var(--bg-elevated); border: 1px solid var(--border);
+  border-radius: 10px; padding: 0.75rem;
+}
+.stl-label {
+  font-size: 0.6rem; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 1px;
+  margin-bottom: 0.4rem; font-weight: 600;
+}
+.stl-panel svg { width: 100%; height: 60px; }
+
+/* Anomaly detail card */
+.anom-detail {
+  background: var(--bg-elevated); border: 1px solid var(--border);
+  border-left: 4px solid var(--danger);
+  border-radius: 12px; padding: 1rem;
+  animation: detailIn 0.4s ease;
+}
+@keyframes detailIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.anom-detail.normal { border-left-color: var(--success); }
+.anom-header {
+  display: flex; align-items: start; justify-content: space-between;
+  margin-bottom: 0.75rem; gap: 0.75rem;
+}
+.anom-title { font-size: 0.95rem; font-weight: 700; margin-bottom: 0.2rem; }
+.anom-meta {
+  font-size: 0.7rem; color: var(--text-muted);
+  font-family: 'Fira Code', monospace;
+}
+.anom-score {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--danger);
+  padding: 0.4rem 0.7rem; border-radius: 8px;
+  font-family: 'Fira Code', monospace;
+  font-weight: 700; font-size: 0.85rem;
+  border: 1px solid var(--danger); flex-shrink: 0;
+}
+.anom-detail.normal .anom-score {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--success); border-color: var(--success);
+}
+
+.anom-explanation {
+  background: var(--bg-dark); border-radius: 8px;
+  padding: 0.75rem; font-size: 0.78rem; line-height: 1.6;
+  color: var(--text-primary); position: relative;
+  margin-bottom: 0.75rem;
+}
+.anom-explanation::before {
+  content: '🤖 LLM Explanation';
+  position: absolute; top: -8px; left: 12px;
+  background: var(--brand-gradient); color: white;
+  font-size: 0.55rem; font-weight: 600;
+  padding: 1px 8px; border-radius: 6px;
+  text-transform: uppercase; letter-spacing: 1px;
+}
+.anom-explanation strong { color: var(--accent); }
+.anom-explanation .price-up { color: var(--danger); font-weight: 600; }
+.anom-explanation .price-down { color: var(--success); font-weight: 600; }
+
+.anom-factors {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+.factor {
+  background: var(--bg-dark); border-radius: 8px; padding: 0.6rem;
+  text-align: center;
+}
+.factor-label {
+  font-size: 0.55rem; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 1px;
+  margin-bottom: 0.2rem;
+}
+.factor-value {
+  font-size: 0.95rem; font-weight: 700;
+  font-family: 'Fira Code', monospace;
+}
+.factor-value.danger { color: var(--danger); }
+.factor-value.warning { color: var(--warning); }
+.factor-value.success { color: var(--success); }
+
+/* Alert log */
+.alert-log { max-height: 380px; overflow-y: auto; }
+.alert-item {
+  background: var(--bg-elevated); border: 1px solid var(--border);
+  border-left: 3px solid var(--danger);
+  border-radius: 10px; padding: 0.7rem 0.85rem;
+  margin-bottom: 0.5rem;
+  cursor: pointer; transition: all 0.2s;
+  animation: slideIn 0.3s ease;
+}
+.alert-item:hover { border-color: var(--primary); transform: translateX(2px); }
+.alert-item.medium { border-left-color: var(--warning); }
+.alert-item.low { border-left-color: var(--text-muted); }
+.alert-item.selected { background: rgba(239, 68, 68, 0.1); border-color: var(--primary); }
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.alert-row {
+  display: flex; justify-content: space-between; align-items: start;
+  gap: 0.5rem;
+}
+.alert-name { font-size: 0.78rem; font-weight: 600; }
+.alert-meta {
+  font-size: 0.65rem; color: var(--text-muted);
+  font-family: 'Fira Code', monospace; margin-top: 0.2rem;
+}
+.alert-delta {
+  font-size: 0.85rem; font-weight: 700;
+  font-family: 'Fira Code', monospace; color: var(--danger);
+}
+.alert-item.medium .alert-delta { color: var(--warning); }
+
+/* Heatmap */
+.heatmap-grid {
+  display: grid;
+  grid-template-columns: 100px repeat(12, 1fr);
+  gap: 2px; font-size: 0.6rem;
+}
+.heatmap-row { display: contents; }
+.heatmap-label {
+  padding: 0.3rem 0.5rem; text-align: right;
+  color: var(--text-secondary); font-size: 0.65rem;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.heatmap-cell {
+  aspect-ratio: 1; border-radius: 3px;
+  transition: all 0.2s; cursor: pointer;
+}
+.heatmap-cell:hover { transform: scale(1.15); z-index: 2; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+.heatmap-month {
+  font-size: 0.55rem; color: var(--text-muted);
+  text-align: center; font-family: 'Fira Code', monospace;
+}
+
+/* Controls */
+.controls { display: flex; gap: 0.5rem; }
+.control-btn {
+  flex: 1; padding: 0.85rem; background: var(--bg-elevated);
+  border: 1px solid var(--border); border-radius: 10px;
+  color: var(--text-primary); font-family: 'Sora', sans-serif;
+  font-size: 0.8rem; font-weight: 600; cursor: pointer;
+  transition: all 0.3s; display: flex; align-items: center;
+  justify-content: center; gap: 0.5rem;
+}
+.control-btn:hover { border-color: var(--primary); background: rgba(239, 68, 68, 0.1); }
+.control-btn.active { background: rgba(239, 68, 68, 0.2); border-color: var(--primary); color: var(--primary); }
+
+/* Sidebar */
+.sidebar { display: flex; flex-direction: column; gap: 1rem; }
+
+/* Model card */
+.model-info { background: var(--bg-elevated); border-radius: 12px; padding: 1rem; }
+.model-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
+.model-icon {
+  width: 48px; height: 48px; background: var(--brand-gradient);
+  border-radius: 10px; display: flex; align-items: center;
+  justify-content: center; font-size: 1.3rem;
+}
+.model-name { font-size: 1rem; font-weight: 700; }
+.model-version { font-size: 0.7rem; color: var(--text-muted); font-family: 'Fira Code', monospace; }
+.model-stats {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem;
+}
+.model-stat {
+  background: var(--bg-dark); border-radius: 8px; padding: 0.6rem 0.5rem; text-align: center;
+}
+.model-stat-value {
+  font-size: 1.05rem; font-weight: 700;
+  font-family: 'Fira Code', monospace; color: var(--accent);
+}
+.model-stat-label {
+  font-size: 0.55rem; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 1.5rem; right: 1.5rem;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 12px; padding: 0.85rem 1.25rem;
+  display: flex; align-items: center; gap: 0.6rem;
+  box-shadow: 0 15px 50px rgba(0,0,0,0.6);
+  transform: translateY(100px); opacity: 0;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); z-index: 1000;
+}
+.toast.show { transform: translateY(0); opacity: 1; }
+.toast-title { font-size: 0.85rem; font-weight: 600; }
+.toast-message { font-size: 0.7rem; color: var(--text-muted); }
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-dark); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+</style>
+</head>
+<body>
+<header class="header">
+  <div class="header-content">
+    <div class="logo">
+      <div class="logo-icon">📈</div>
+      <div>
+        <div class="logo-text">MargeGuard</div>
+        <div class="logo-subtitle">ogmah · Price Anomaly Detection</div>
+      </div>
+    </div>
+    <div class="header-badges">
+      <span class="badge live">● Monitoring</span>
+      <span class="badge">STL + Isolation Forest</span>
+      <span class="badge">LLM Explanations</span>
+      <span class="badge">427 SKUs · 12 Suppliers</span>
+    </div>
+  </div>
+</header>
+
+<main class="main">
+  <div class="hero">
+    <h1>📈 Catch Suspicious Price Hikes Before They Eat Your Margin</h1>
+    <p>Statistical anomaly detection on supplier price lists, with an LLM that explains <em>why</em> each alert matters</p>
+  </div>
+
+  <div class="kpi-strip">
+    <div class="kpi">
+      <div class="kpi-icon red">🚨</div>
+      <div class="kpi-content">
+        <div class="kpi-label">Active Anomalies</div>
+        <div class="kpi-value">7</div>
+        <div class="kpi-trend up">↑ 3 vs last week</div>
+      </div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-icon green">💰</div>
+      <div class="kpi-content">
+        <div class="kpi-label">Saved YTD</div>
+        <div class="kpi-value">€18.4k</div>
+        <div class="kpi-trend down">↑ across 23 alerts</div>
+      </div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-icon purple">🎯</div>
+      <div class="kpi-content">
+        <div class="kpi-label">Precision</div>
+        <div class="kpi-value">0.91</div>
+        <div class="kpi-trend down">recall: 0.87</div>
+      </div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-icon cyan">🔍</div>
+      <div class="kpi-content">
+        <div class="kpi-label">SKUs Monitored</div>
+        <div class="kpi-value">427</div>
+        <div class="kpi-trend down">across 12 suppliers</div>
+      </div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-icon amber">⏱️</div>
+      <div class="kpi-content">
+        <div class="kpi-label">Detection Latency</div>
+        <div class="kpi-value">&lt;5min</div>
+        <div class="kpi-trend down">post-mercuriale</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="workspace">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">📊 Price Time Series · 12-Month Window</h3>
+        <span style="font-size: 0.7rem; color: var(--text-muted); font-family: 'Fira Code';">Source: 12 supplier mercuriales · Weekly resolution</span>
+      </div>
+      <div class="card-body">
+        <div class="product-selector" id="productSelector"></div>
+
+        <div class="chart-container">
+          <div class="chart-svg-wrap" id="chartWrap">
+            <svg class="chart-svg" id="chartSvg" viewBox="0 0 800 280" preserveAspectRatio="none"></svg>
+            <div class="chart-anom-tooltip" id="anomTooltip"></div>
+          </div>
+          <div class="chart-legend">
+            <div class="legend-item"><span class="legend-swatch" style="background: var(--accent);"></span><span>Observed Price</span></div>
+            <div class="legend-item"><span class="legend-swatch" style="background: var(--secondary);"></span><span>Trend (STL)</span></div>
+            <div class="legend-item"><span class="legend-swatch" style="background: var(--text-muted);"></span><span>Forecast Band ±2σ</span></div>
+            <div class="legend-item"><span class="legend-swatch" style="background: var(--danger);"></span><span>Anomaly</span></div>
+          </div>
+        </div>
+
+        <div class="card-title" style="margin-top: 1rem; margin-bottom: 0.5rem;">🔬 STL Decomposition</div>
+        <div class="stl-grid">
+          <div class="stl-panel">
+            <div class="stl-label">Trend</div>
+            <svg id="stlTrend" viewBox="0 0 200 60" preserveAspectRatio="none"></svg>
+          </div>
+          <div class="stl-panel">
+            <div class="stl-label">Seasonal</div>
+            <svg id="stlSeason" viewBox="0 0 200 60" preserveAspectRatio="none"></svg>
+          </div>
+          <div class="stl-panel">
+            <div class="stl-label">Residual</div>
+            <svg id="stlResid" viewBox="0 0 200 60" preserveAspectRatio="none"></svg>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">🧠 Detection Stack</h3>
+        </div>
+        <div class="card-body">
+          <div class="model-info">
+            <div class="model-header">
+              <div class="model-icon">⚡</div>
+              <div>
+                <div class="model-name">MargeGuard-v2</div>
+                <div class="model-version">STL + IF + GPT-4o explainer</div>
+              </div>
+            </div>
+            <div class="model-stats">
+              <div class="model-stat">
+                <div class="model-stat-value">2.7%</div>
+                <div class="model-stat-label">FPR</div>
+              </div>
+              <div class="model-stat">
+                <div class="model-stat-value">0.87</div>
+                <div class="model-stat-label">Recall</div>
+              </div>
+              <div class="model-stat">
+                <div class="model-stat-value">52</div>
+                <div class="model-stat-label">Weeks Hist.</div>
+              </div>
+              <div class="model-stat">
+                <div class="model-stat-value">1.4s</div>
+                <div class="model-stat-label">Inference</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">🚨 Active Alert Queue</h3>
+          <span style="font-size: 0.65rem; color: var(--text-muted);" id="alertCount">7 alerts</span>
+        </div>
+        <div class="card-body">
+          <div class="alert-log" id="alertLog"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">🔍 Anomaly Detail · LLM-Generated Explanation</h3>
+      <span style="font-size: 0.7rem; color: var(--text-muted);" id="detailMeta">Click an alert or chart point</span>
+    </div>
+    <div class="card-body">
+      <div id="detailContainer">
+        <div class="anom-detail" id="anomDetail">
+          <div class="anom-header">
+            <div>
+              <div class="anom-title" id="anomTitle">Select an alert to inspect</div>
+              <div class="anom-meta" id="anomMetaText">—</div>
+            </div>
+            <div class="anom-score" id="anomScore">—</div>
+          </div>
+          <div class="anom-explanation" id="anomExplanation" style="margin-top: 1rem;">
+            Click any alert in the queue (right) or any red point on the chart to see the LLM-generated explanation, statistical breakdown, and recommended action.
+          </div>
+          <div class="anom-factors">
+            <div class="factor">
+              <div class="factor-label">YoY Change</div>
+              <div class="factor-value" id="factYoY">—</div>
+            </div>
+            <div class="factor">
+              <div class="factor-label">Vs Seasonal</div>
+              <div class="factor-value" id="factSeason">—</div>
+            </div>
+            <div class="factor">
+              <div class="factor-label">IF Score</div>
+              <div class="factor-value" id="factIF">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top: 1.25rem;">
+    <div class="card-header">
+      <h3 class="card-title">🌡️ Anomaly Heatmap · SKU × Month</h3>
+      <span style="font-size: 0.7rem; color: var(--text-muted);">Last 12 months · darker = stronger anomaly score</span>
+    </div>
+    <div class="card-body">
+      <div class="heatmap-grid" id="heatmap"></div>
+    </div>
+  </div>
+</main>
+
+<div class="toast" id="toast">
+  <span style="font-size: 1.3rem;">✅</span>
+  <div>
+    <div class="toast-title" id="toastTitle">Done</div>
+    <div class="toast-message" id="toastMessage">—</div>
+  </div>
+</div>
+
+<script>
+// ===== Mock data =====
+const products = {
+  beef_rib: {
+    name: 'Côte de bœuf maturée',
+    supplier: 'Provence Halal',
+    unit: '€/kg',
+    base: 28.5,
+    series: generateSeries(28.5, 0.04, [{w: 44, mult: 1.18}, {w: 38, mult: 1.09}]),
+    anomalies: [
+      { week: 44, label: 'W44 · 5 nov.', price: 33.8, expected: 30.2, score: 0.94, deltaPct: 18.5, severity: 'high',
+        title: 'Côte de bœuf — anomalous price hike',
+        explain: `Provence Halal raised the price of <strong>côte de bœuf maturée</strong> from <span class="price-up">28.50 €/kg → 33.80 €/kg</span> (+18.5%) in week 44. The expected November seasonal increase is only <strong>+8% to 30.20 €/kg</strong>, so the residual after removing trend and seasonality is <strong>+3.60 €/kg</strong> (Isolation Forest score 0.94, top 1% of the catalog). Cross-referencing other suppliers: Boucherie Métropolitaine quotes 31.20 €/kg this week (+9.5%), confirming this is a Provence-Halal-specific anomaly, not a market-wide event. <strong>Recommended action:</strong> contact account manager Tristan G. and renegotiate, or swap volume to Boucherie Métropolitaine for the next 4 weeks (estimated savings: <span class="price-down">€312/week</span>).`,
+        yoy: '+22.4%', season: '+3.60€', if: '0.94' },
+      { week: 38, label: 'W38 · 17 sept.', price: 31.0, expected: 28.4, score: 0.71, deltaPct: 9.1, severity: 'medium',
+        title: 'Côte de bœuf — moderate hike, watch',
+        explain: `<strong>+9.1%</strong> hike in week 38, <span class="price-up">+2.6 €/kg</span> above expected. This is around the <strong>Rosh Hashanah / rentrée</strong> period — historical seasonality already accounts for +5%, but this exceeds it. Not yet alarming; flagged for monitoring. If it persists into week 40, escalate.`,
+        yoy: '+11.2%', season: '+2.6€', if: '0.71' }
+    ]
+  },
+  olive_oil: {
+    name: 'Huile d\'olive AOC',
+    supplier: 'Provence Halal',
+    unit: '€/L',
+    base: 11.20,
+    series: generateSeries(11.20, 0.03, [{w: 26, mult: 1.34}]),
+    anomalies: [
+      { week: 26, label: 'W26 · 23 juin', price: 15.0, expected: 11.45, score: 0.97, deltaPct: 33.9, severity: 'high',
+        title: 'Huile d\'olive AOC — major price shock',
+        explain: `<strong>Critical anomaly</strong>: huile d'olive AOC Provence rose from <span class="price-up">11.20 €/L → 15.00 €/L</span> (+33.9%) in a single week. Isolation Forest score <strong>0.97</strong> (top 0.5% of all SKU events). Context: 2024–2025 Mediterranean drought reduced Spanish & Italian olive yields by ~40% (well-documented in trade press). This is a <strong>structural market shift</strong>, not a supplier-specific gouge — all 4 suppliers monitored show similar pattern. <strong>Recommended action:</strong> not negotiable. Re-price all dressings, vinaigrettes, and finishing oils on the menu; consider partial substitution with sunflower-blend for non-finishing uses. Estimated menu food-cost impact: <span class="price-up">+1.4 pts</span>.`,
+        yoy: '+38.7%', season: '+3.55€', if: '0.97' }
+    ]
+  },
+  saffron: {
+    name: 'Safran filaments',
+    supplier: 'Épices du Monde',
+    unit: '€/g',
+    base: 8.40,
+    series: generateSeries(8.40, 0.05, []),
+    anomalies: []
+  },
+  butter: {
+    name: 'Beurre AOP Charentes',
+    supplier: 'Laiterie Centrale',
+    unit: '€/kg',
+    base: 9.80,
+    series: generateSeries(9.80, 0.025, [{w: 48, mult: 1.07}]),
+    anomalies: [
+      { week: 48, label: 'W48 · 3 déc.', price: 10.50, expected: 10.05, score: 0.62, deltaPct: 7.1, severity: 'low',
+        title: 'Beurre AOP — within seasonal envelope',
+        explain: `Modest +7.1% hike, but December is the historical peak (Christmas pastry demand). Forecast band already anticipated <strong>+5%</strong>; current price exceeds by only +0.45 €/kg. <strong>Verdict: borderline normal.</strong> No action required.`,
+        yoy: '+4.2%', season: '+0.45€', if: '0.62' }
+    ]
+  },
+  bar: {
+    name: 'Bar sauvage filet',
+    supplier: 'Marée Atlantique',
+    unit: '€/kg',
+    base: 38.5,
+    series: generateSeries(38.5, 0.05, [{w: 31, mult: 1.22}]),
+    anomalies: [
+      { week: 31, label: 'W31 · 29 juil.', price: 47.0, expected: 41.0, score: 0.88, deltaPct: 22.1, severity: 'high',
+        title: 'Bar sauvage — supply shock detected',
+        explain: `Bar sauvage filet jumped <span class="price-up">+22.1%</span> in week 31, well above the +6% summer-tourism seasonality. IF score <strong>0.88</strong>. Cross-supplier check shows similar move (+18% to +24% across 3 suppliers monitored), suggesting a <strong>fishing quota or storm-related supply shock</strong> rather than supplier-specific behavior. <strong>Recommendation:</strong> menu engineering — substitute "bar sauvage" with "lieu jaune ligne" for the August menu (taste profile close, cost: 18.50 €/kg). Estimated saving: <span class="price-down">€840/week</span>.`,
+        yoy: '+19.5%', season: '+6.0€', if: '0.88' }
+    ]
+  }
+};
+
+const allAlerts = [
+  { product: 'beef_rib', anomIdx: 0 },
+  { product: 'olive_oil', anomIdx: 0 },
+  { product: 'bar', anomIdx: 0 },
+  { product: 'beef_rib', anomIdx: 1 },
+  { product: 'butter', anomIdx: 0 },
+];
+
+function generateSeries(base, noise, anomalies) {
+  const series = [];
+  for (let w = 1; w <= 52; w++) {
+    // Trend: slight upward drift
+    const trend = base * (1 + (w / 52) * 0.04);
+    // Seasonality: mild sinusoidal + holiday peaks
+    const seasonal = base * 0.03 * Math.sin((w / 52) * 2 * Math.PI - Math.PI / 2);
+    let val = trend + seasonal + (Math.random() - 0.5) * base * noise;
+    // Apply anomalies
+    const anom = anomalies.find(a => a.w === w);
+    if (anom) val *= anom.mult;
+    series.push({ week: w, price: val, isAnom: !!anom });
+  }
+  return series;
+}
+
+let currentProduct = 'beef_rib';
+let selectedAlert = null;
+
+function renderProductSelector() {
+  const sel = document.getElementById('productSelector');
+  sel.innerHTML = '';
+  Object.entries(products).forEach(([key, p]) => {
+    const chip = document.createElement('div');
+    chip.className = 'prod-chip' + (key === currentProduct ? ' active' : '');
+    const dot = p.anomalies.length > 0 ? '<span class="anom-dot"></span>' : '<span class="clean-dot"></span>';
+    chip.innerHTML = `${dot} ${p.name} <small style="opacity:.6">·${p.anomalies.length}</small>`;
+    chip.onclick = () => { currentProduct = key; renderAll(); };
+    sel.appendChild(chip);
+  });
+}
+
+function renderChart() {
+  const p = products[currentProduct];
+  const svg = document.getElementById('chartSvg');
+  const W = 800, H = 280;
+  const padX = 40, padY = 20;
+  const series = p.series;
+  const prices = series.map(s => s.price);
+  const minP = Math.min(...prices) * 0.92;
+  const maxP = Math.max(...prices) * 1.08;
+  const xStep = (W - padX * 2) / (series.length - 1);
+  const yScale = (val) => H - padY - ((val - minP) / (maxP - minP)) * (H - padY * 2);
+  const xPos = (i) => padX + i * xStep;
+
+  // Build trend (smoothed) and band
+  const trend = series.map((s, i) => {
+    const w = 5; // moving average window
+    let sum = 0, n = 0;
+    for (let j = Math.max(0, i - w); j <= Math.min(series.length - 1, i + w); j++) {
+      sum += series[j].price; n++;
+    }
+    return sum / n;
+  });
+
+  // Build paths
+  const pricePath = series.map((s, i) => `${i === 0 ? 'M' : 'L'} ${xPos(i)} ${yScale(s.price)}`).join(' ');
+  const trendPath = trend.map((t, i) => `${i === 0 ? 'M' : 'L'} ${xPos(i)} ${yScale(t)}`).join(' ');
+  const bandUp = trend.map((t, i) => `${i === 0 ? 'M' : 'L'} ${xPos(i)} ${yScale(t * 1.06)}`).join(' ');
+  const bandDn = trend.slice().reverse().map((t, i) => {
+    const idx = trend.length - 1 - i;
+    return `L ${xPos(idx)} ${yScale(t * 0.94)}`;
+  }).join(' ');
+  const bandPath = bandUp + ' ' + bandDn + ' Z';
+
+  // Grid + axes
+  let gridLines = '';
+  for (let i = 0; i <= 4; i++) {
+    const y = padY + i * (H - padY * 2) / 4;
+    gridLines += `<line x1="${padX}" y1="${y}" x2="${W - padX}" y2="${y}" stroke="rgba(148,163,184,0.08)" stroke-width="1"/>`;
+    const yVal = maxP - (i / 4) * (maxP - minP);
+    gridLines += `<text x="${padX - 6}" y="${y + 3}" fill="#64748b" font-size="9" text-anchor="end" font-family="Fira Code">${yVal.toFixed(1)}</text>`;
+  }
+  // X labels (months)
+  const months = ['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Août','Sept','Oct','Nov','Déc'];
+  let xLabels = '';
+  months.forEach((m, mi) => {
+    const x = xPos(mi * 4.3);
+    xLabels += `<text x="${x}" y="${H - 4}" fill="#64748b" font-size="9" text-anchor="middle" font-family="Fira Code">${m}</text>`;
+  });
+
+  // Anomaly markers
+  let anomMarkers = '';
+  p.anomalies.forEach((a, i) => {
+    const idx = a.week - 1;
+    const cx = xPos(idx);
+    const cy = yScale(a.price);
+    const fill = a.severity === 'high' ? '#ef4444' : a.severity === 'medium' ? '#f59e0b' : '#94a3b8';
+    anomMarkers += `
+      <circle cx="${cx}" cy="${cy}" r="14" fill="${fill}" opacity="0.25" class="anom-glow">
+        <animate attributeName="r" values="14;20;14" dur="2s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.25;0.05;0.25" dur="2s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="${cx}" cy="${cy}" r="6" fill="${fill}" stroke="#0c0f23" stroke-width="2" class="anom-point" style="cursor:pointer"
+              data-product="${currentProduct}" data-anom-idx="${i}"/>
+    `;
+  });
+
+  svg.innerHTML = `
+    ${gridLines}
+    ${xLabels}
+    <path d="${bandPath}" fill="rgba(148,163,184,0.08)" stroke="none"/>
+    <path d="${trendPath}" fill="none" stroke="#8b5cf6" stroke-width="1.5" stroke-dasharray="3,3" opacity="0.85"/>
+    <path d="${pricePath}" fill="none" stroke="#06b6d4" stroke-width="2"/>
+    ${anomMarkers}
+  `;
+
+  // Wire up clicks
+  svg.querySelectorAll('.anom-point').forEach(c => {
+    c.addEventListener('click', () => {
+      const pkey = c.dataset.product;
+      const aidx = parseInt(c.dataset.anomIdx);
+      selectAlert(pkey, aidx);
+    });
+    c.addEventListener('mouseenter', (e) => {
+      const a = p.anomalies[parseInt(c.dataset.anomIdx)];
+      const tooltip = document.getElementById('anomTooltip');
+      tooltip.innerHTML = `<strong style="color: var(--danger);">${a.label}</strong><br>${a.price.toFixed(2)} ${p.unit} <span style="color: var(--danger)">(+${a.deltaPct}%)</span>`;
+      const rect = c.getBoundingClientRect();
+      const wrap = document.getElementById('chartWrap').getBoundingClientRect();
+      tooltip.style.left = (rect.left - wrap.left + 12) + 'px';
+      tooltip.style.top = (rect.top - wrap.top - 40) + 'px';
+      tooltip.classList.add('show');
+    });
+    c.addEventListener('mouseleave', () => {
+      document.getElementById('anomTooltip').classList.remove('show');
+    });
+  });
+}
+
+function renderSTL() {
+  const p = products[currentProduct];
+  const series = p.series;
+  // Trend (smoothed)
+  const trend = series.map((s, i) => {
+    const w = 8;
+    let sum = 0, n = 0;
+    for (let j = Math.max(0, i - w); j <= Math.min(series.length - 1, i + w); j++) {
+      sum += series[j].price; n++;
+    }
+    return sum / n;
+  });
+  // Seasonal (residual against trend, smoothed periodic)
+  const seasonal = series.map((s, i) => p.base * 0.03 * Math.sin((i / 52) * 2 * Math.PI - Math.PI / 2));
+  // Residual = original - trend - seasonal
+  const residual = series.map((s, i) => s.price - trend[i] - seasonal[i]);
+
+  drawMini('stlTrend', trend, '#8b5cf6');
+  drawMini('stlSeason', seasonal, '#06b6d4');
+  drawMini('stlResid', residual, '#ef4444', true);
+}
+
+function drawMini(id, data, color, isResid) {
+  const svg = document.getElementById(id);
+  const W = 200, H = 60;
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = (max - min) || 1;
+  const xStep = W / (data.length - 1);
+  const path = data.map((v, i) => {
+    const x = i * xStep;
+    const y = H - 5 - ((v - min) / range) * (H - 10);
+    return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
+  }).join(' ');
+
+  let zeroLine = '';
+  if (isResid) {
+    const zeroY = H - 5 - ((0 - min) / range) * (H - 10);
+    zeroLine = `<line x1="0" y1="${zeroY}" x2="${W}" y2="${zeroY}" stroke="rgba(148,163,184,0.2)" stroke-width="1" stroke-dasharray="2,2"/>`;
+
+    // Mark anomalies in residual
+    const p = products[currentProduct];
+    p.anomalies.forEach(a => {
+      const idx = a.week - 1;
+      const x = idx * xStep;
+      const y = H - 5 - ((data[idx] - min) / range) * (H - 10);
+      zeroLine += `<circle cx="${x}" cy="${y}" r="3" fill="${color}"/>`;
+    });
+  }
+  svg.innerHTML = `${zeroLine}<path d="${path}" fill="none" stroke="${color}" stroke-width="1.5"/>`;
+}
+
+function renderAlerts() {
+  const log = document.getElementById('alertLog');
+  log.innerHTML = '';
+  let count = 0;
+  Object.entries(products).forEach(([key, p]) => {
+    p.anomalies.forEach((a, i) => {
+      const item = document.createElement('div');
+      item.className = 'alert-item ' + a.severity;
+      if (selectedAlert && selectedAlert.product === key && selectedAlert.idx === i) {
+        item.classList.add('selected');
+      }
+      item.onclick = () => selectAlert(key, i);
+      item.innerHTML = `
+        <div class="alert-row">
+          <div style="flex:1">
+            <div class="alert-name">${p.name}</div>
+            <div class="alert-meta">${p.supplier} · ${a.label}</div>
+          </div>
+          <div class="alert-delta">+${a.deltaPct.toFixed(1)}%</div>
+        </div>
+      `;
+      log.appendChild(item);
+      count++;
+    });
+  });
+  document.getElementById('alertCount').textContent = count + ' alerts';
+}
+
+function selectAlert(productKey, anomIdx) {
+  selectedAlert = { product: productKey, idx: anomIdx };
+  if (productKey !== currentProduct) {
+    currentProduct = productKey;
+    renderProductSelector();
+    renderChart();
+    renderSTL();
+  }
+  const p = products[productKey];
+  const a = p.anomalies[anomIdx];
+
+  document.getElementById('detailMeta').textContent = `${p.name} · ${a.label}`;
+
+  const detail = document.getElementById('anomDetail');
+  detail.classList.remove('normal');
+
+  document.getElementById('anomTitle').innerHTML = `🚨 ${a.title}`;
+  document.getElementById('anomMetaText').textContent = `${p.supplier} · ${a.label} · ${a.price.toFixed(2)} ${p.unit} (expected ${a.expected.toFixed(2)} ${p.unit})`;
+  document.getElementById('anomScore').textContent = `IF ${a.score.toFixed(2)}`;
+  document.getElementById('anomExplanation').innerHTML = a.explain;
+  document.getElementById('factYoY').textContent = a.yoy;
+  document.getElementById('factYoY').className = 'factor-value ' + (a.yoy.startsWith('+') ? 'danger' : 'success');
+  document.getElementById('factSeason').textContent = a.season;
+  document.getElementById('factSeason').className = 'factor-value warning';
+  document.getElementById('factIF').textContent = a.if;
+  document.getElementById('factIF').className = 'factor-value ' + (parseFloat(a.if) > 0.85 ? 'danger' : parseFloat(a.if) > 0.65 ? 'warning' : 'success');
+
+  renderAlerts();
+
+  showToast('Alert selected', `${p.name} · IF ${a.score.toFixed(2)}`);
+}
+
+function renderHeatmap() {
+  const grid = document.getElementById('heatmap');
+  grid.innerHTML = '';
+  const months = ['Mai','Juin','Juil','Août','Sept','Oct','Nov','Déc','Jan','Fév','Mar','Avr'];
+  // Header row
+  grid.innerHTML += '<div class="heatmap-label" style="text-align:left">SKU</div>';
+  months.forEach(m => grid.innerHTML += `<div class="heatmap-month">${m}</div>`);
+
+  const skus = [
+    { name: 'Côte de bœuf', vals: [0.1,0.05,0.0,0.08,0.71,0.12,0.94,0.1,0.05,0.0,0.0,0.05] },
+    { name: "Huile d'olive", vals: [0.0,0.97,0.05,0.1,0.05,0.0,0.0,0.05,0.0,0.05,0.1,0.05] },
+    { name: 'Bar sauvage', vals: [0.0,0.0,0.88,0.05,0.05,0.0,0.05,0.0,0.0,0.0,0.0,0.0] },
+    { name: 'Beurre AOP', vals: [0.0,0.0,0.05,0.0,0.0,0.05,0.05,0.62,0.05,0.0,0.0,0.0] },
+    { name: 'Veau épaule', vals: [0.05,0.0,0.05,0.1,0.05,0.0,0.0,0.05,0.0,0.0,0.05,0.0] },
+    { name: 'Suprême volaille', vals: [0.0,0.05,0.0,0.05,0.0,0.0,0.05,0.0,0.0,0.05,0.0,0.0] },
+    { name: 'Carré agneau', vals: [0.05,0.05,0.0,0.0,0.0,0.0,0.05,0.1,0.05,0.0,0.0,0.0] },
+    { name: 'Crème fraîche', vals: [0.0,0.0,0.0,0.05,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.05] },
+    { name: 'Farine T55', vals: [0.0,0.0,0.0,0.0,0.05,0.0,0.0,0.0,0.0,0.0,0.0,0.0] },
+    { name: 'Champignons', vals: [0.05,0.0,0.0,0.0,0.0,0.05,0.0,0.05,0.0,0.0,0.05,0.0] },
+  ];
+  skus.forEach(s => {
+    grid.innerHTML += `<div class="heatmap-label">${s.name}</div>`;
+    s.vals.forEach(v => {
+      const intensity = v;
+      const color = intensity > 0.5
+        ? `rgba(239, 68, 68, ${0.3 + intensity * 0.7})`
+        : intensity > 0.2
+        ? `rgba(245, 158, 11, ${0.3 + intensity * 0.7})`
+        : `rgba(16, 185, 129, ${0.1 + intensity * 0.5})`;
+      grid.innerHTML += `<div class="heatmap-cell" style="background:${color}" title="IF score: ${v.toFixed(2)}"></div>`;
+    });
+  });
+}
+
+function renderAll() {
+  renderProductSelector();
+  renderChart();
+  renderSTL();
+  renderAlerts();
+  renderHeatmap();
+}
+
+function showToast(title, message) {
+  const toast = document.getElementById('toast');
+  document.getElementById('toastTitle').textContent = title;
+  document.getElementById('toastMessage').textContent = message;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+renderAll();
+// Auto-select first alert for demo
+setTimeout(() => selectAlert('beef_rib', 0), 600);
+</script>
+</body>
+</html>
